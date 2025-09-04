@@ -37,9 +37,9 @@ require('dotenv').config();
 
 // Direct fallback values if .env values are commented out
 const sequelize = new Sequelize(
-  'Route-Budget',    // DB name fallback
+  'route_budget',    // DB name fallback
   'postgres',       // Username fallback
-  'root',          // Password fallback
+  'password@181298',          // Password fallback
   {
     host: 'localhost',
     port: 5432,
