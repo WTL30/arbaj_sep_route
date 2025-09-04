@@ -1,12 +1,17 @@
 const WebSocket = require("ws");
+require("dotenv").config();
+
+const WS_PORT = parseInt(process.env.WS_PORT || "6010", 10);
+const WS_HOST = process.env.WS_HOST || "0.0.0.0"; // bind to all interfaces for VPS
 
 const wss = new WebSocket.Server({ 
-  port: 6010,
+  port: WS_PORT,
+  host: WS_HOST,
   perMessageDeflate: false // Disable compression for debugging
 });
 
-console.log("✅ WebSocket server running at ws://localhost:6010");
-console.log("📡 Waiting for client connections...");
+console.log(`WebSocket server running at ws://${WS_HOST}:${WS_PORT}`);
+console.log("Waiting for client connections...");
 
 const clients = new Map(); // IMEI → [ws, ws]
 
@@ -16,8 +21,8 @@ const heartbeat = function() {
 };
 
 wss.on("connection", (ws, req) => {
-  console.log(`🔌 New WebSocket connection from ${req.socket.remoteAddress}`);
-  console.log(`📊 Total connections: ${wss.clients.size}`);
+  console.log(`New WebSocket connection from ${req.socket.remoteAddress}`);
+  console.log(`Total connections: ${wss.clients.size}`);
   
   // Initialize heartbeat
   ws.isAlive = true;
@@ -25,15 +30,15 @@ wss.on("connection", (ws, req) => {
   
   ws.on("message", (message) => {
     try {
-      console.log(`📨 Raw message received: ${message}`);
+      console.log(`Raw message received: ${message}`);
       
       const parsedMessage = JSON.parse(message);
-      console.log(`🔍 Parsed message:`, parsedMessage);
+      console.log(`Parsed message:`, parsedMessage);
       
       const { imei } = parsedMessage;
       
       if (!imei) {
-        console.warn("⚠️  No IMEI provided in message");
+        console.warn("No IMEI provided in message");
         ws.send(JSON.stringify({ error: "IMEI is required" }));
         return;
       }
@@ -44,16 +49,16 @@ wss.on("connection", (ws, req) => {
       // Add client to IMEI subscription map
       if (!clients.has(imei)) {
         clients.set(imei, []);
-        console.log(`📋 Created new subscription list for IMEI: ${imei}`);
+        console.log(`Created new subscription list for IMEI: ${imei}`);
       }
       
       const clientList = clients.get(imei);
       if (!clientList.includes(ws)) {
         clientList.push(ws);
-        console.log(`✅ Client subscribed for IMEI: ${imei}`);
-        console.log(`📊 Total subscribers for ${imei}: ${clientList.length}`);
+        console.log(`Client subscribed for IMEI: ${imei}`);
+        console.log(`Total subscribers for ${imei}: ${clientList.length}`);
       } else {
-        console.log(`🔄 Client already subscribed for IMEI: ${imei}`);
+        console.log(`Client already subscribed for IMEI: ${imei}`);
       }
       
       // Send confirmation back to client
@@ -63,46 +68,46 @@ wss.on("connection", (ws, req) => {
         message: `Successfully subscribed to GPS updates for ${imei}`
       }));
       
-      console.log(`📡 Subscription confirmed for IMEI: ${imei}`);
+      console.log(`Subscription confirmed for IMEI: ${imei}`);
       
     } catch (err) {
-      console.error("❌ Error parsing message from client:", err.message);
-      console.error("📋 Raw message that failed:", message.toString());
+      console.error("Error parsing message from client:", err.message);
+      console.error("Raw message that failed:", message.toString());
       ws.send(JSON.stringify({ error: "Invalid JSON message" }));
     }
   });
 
   ws.on("close", (code, reason) => {
-    console.log(`🔌 Client disconnected. Code: ${code}, Reason: ${reason}`);
+    console.log(`Client disconnected. Code: ${code}, Reason: ${reason}`);
     
     if (ws.imei && clients.has(ws.imei)) {
       const updated = clients.get(ws.imei).filter((c) => c !== ws);
       clients.set(ws.imei, updated);
-      console.log(`🗑️  Removed client from IMEI: ${ws.imei}`);
-      console.log(`📊 Remaining subscribers for ${ws.imei}: ${updated.length}`);
+      console.log(`Removed client from IMEI: ${ws.imei}`);
+      console.log(`Remaining subscribers for ${ws.imei}: ${updated.length}`);
       
       // Clean up empty subscription lists
       if (updated.length === 0) {
         clients.delete(ws.imei);
-        console.log(`🧹 Cleaned up empty subscription list for IMEI: ${ws.imei}`);
+        console.log(`Cleaned up empty subscription list for IMEI: ${ws.imei}`);
       }
     }
     
-    console.log(`📊 Total connections remaining: ${wss.clients.size}`);
+    console.log(`Total connections remaining: ${wss.clients.size}`);
   });
   
   ws.on("error", (error) => {
-    console.error("❌ WebSocket client error:", error);
+    console.error("WebSocket client error:", error);
   });
 });
 
 // Heartbeat interval to detect broken connections
 const heartbeatInterval = setInterval(function ping() {
-  console.log(`💓 Sending heartbeat to ${wss.clients.size} clients`);
+  console.log(`Sending heartbeat to ${wss.clients.size} clients`);
   
   wss.clients.forEach(function each(ws) {
     if (ws.isAlive === false) {
-      console.log(`💀 Terminating dead connection for IMEI: ${ws.imei || 'unknown'}`);
+      console.log(`Terminating dead connection for IMEI: ${ws.imei || 'unknown'}`);
       return ws.terminate();
     }
     
@@ -114,17 +119,17 @@ const heartbeatInterval = setInterval(function ping() {
 // Enhanced broadcast function with detailed logging
 function getBroadcastGPS() {
  return function (imei, lat, lon, ignition, speed){
-    console.log(`🛰️  Broadcasting GPS data for IMEI: ${imei}`);
-    console.log(`📍 Coordinates: ${lat}, ${lon}`);
-    console.log(`🔥 Ignition: ${ignition ? 'ON' : 'OFF'}`);
-    console.log(`🚗 Speed: ${speed} km/h`);
+    console.log(`Broadcasting GPS data for IMEI: ${imei}`);
+    console.log(`Coordinates: ${lat}, ${lon}`);
+    console.log(`Ignition: ${ignition ? 'ON' : 'OFF'}`);
+    console.log(`Speed: ${speed} km/h`);
     
     const subscribers = clients.get(imei) || [];
-    console.log(`📡 Found ${subscribers.length} subscribers for IMEI: ${imei}`);
+    console.log(`Found ${subscribers.length} subscribers for IMEI: ${imei}`);
     
     if (subscribers.length === 0) {
-      console.log(`⚠️  No subscribers found for IMEI: ${imei}`);
-      console.log(`📋 Available IMEIs:`, Array.from(clients.keys()));
+      console.log(`No subscribers found for IMEI: ${imei}`);
+      console.log(`Available IMEIs:`, Array.from(clients.keys()));
       return;
     }
     
@@ -138,7 +143,7 @@ function getBroadcastGPS() {
       timestamp: new Date().toISOString()
     });
     
-    console.log(`📤 Broadcasting message: ${message}`);
+    console.log(`Broadcasting message: ${message}`);
     
     let successCount = 0;
     let failCount = 0;
@@ -148,24 +153,24 @@ function getBroadcastGPS() {
         if (client.readyState === WebSocket.OPEN) {
           client.send(message);
           successCount++;
-          console.log(`✅ Message sent to client for IMEI: ${imei}`);
+          console.log(` Message sent to client for IMEI: ${imei}`);
         } else {
           failCount++;
-          console.log(`❌ Client connection not open for IMEI: ${imei}, state: ${client.readyState}`);
+          console.log(`Client connection not open for IMEI: ${imei}, state: ${client.readyState}`);
         }
       } catch (error) {
         failCount++;
-        console.error(`❌ Error sending message to client for IMEI: ${imei}`, error);
+        console.error(` Error sending message to client for IMEI: ${imei}`, error);
       }
     }
     
-    console.log(`📊 Broadcast summary for ${imei}: ${successCount} success, ${failCount} failed`);
+    console.log(`Broadcast summary for ${imei}: ${successCount} success, ${failCount} failed`);
   };
 }
 
 // Server error handling
 wss.on('error', (error) => {
-  console.error('❌ WebSocket server error:', error);
+  console.error('WebSocket server error:', error);
 });
 
 // Graceful shutdown
@@ -178,7 +183,7 @@ process.on('SIGINT', () => {
   });
   
   wss.close(() => {
-    console.log('✅ WebSocket server closed');
+    console.log('WebSocket server closed');
     process.exit(0);
   });
 });

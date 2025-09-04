@@ -206,6 +206,7 @@
 
 // const totalCab = async (req, res) => {
 //   try {
+
 //     // If you are counting admin documents
 //     const cab = await Cab.countDocuments(); // Ensure this is the correct model for the task
 
@@ -794,6 +795,7 @@
 //     res.status(500).json({ success: false, message: error.message });
 //   }
 // };
+
 // //  Export all functions correctly
 // module.exports = {
 //   registerAdmin,
