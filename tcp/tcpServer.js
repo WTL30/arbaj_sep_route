@@ -160,10 +160,12 @@ const server = net.createServer((socket) => {
         socket.write(Buffer.from(ack, "hex"));
         console.log("📨 Sent calculated ACK for protocol 01");
         
-        // Configure GPS device after successful login
-        setTimeout(() => {
-          configureGPSDevice(socket);
-        }, 3000);
+        // Configure GPS device after successful login (DISABLED)
+        // Some devices disconnect on unexpected binary config commands.
+        // If you need to configure intervals, use vendor-approved SMS or enable this only after verifying command format.
+        // setTimeout(() => {
+        //   configureGPSDevice(socket);
+        // }, 3000);
       }
 
       else if (protocol === "13") {

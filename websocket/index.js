@@ -1,7 +1,7 @@
 const WebSocket = require("ws");
 require("dotenv").config();
 
-const WS_PORT = parseInt(process.env.WS_PORT || "6010", 10);
+const WS_PORT = parseInt(process.env.WS_PORT || "7001", 10);
 const WS_HOST = process.env.WS_HOST || "0.0.0.0"; // bind to all interfaces for VPS
 
 const wss = new WebSocket.Server({ 
