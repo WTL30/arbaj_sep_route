@@ -94,38 +94,30 @@
 // server.listen(PORT, () => console.log(`Server running on port ${PORT}`))
 
 
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-require('./tcp/tcpServer.js')
 const dotenv = require("dotenv");
 const createError = require("http-errors");
 const cookieParser = require("cookie-parser");
 const logger = require("morgan");
 const path = require("path");
-const  OpenAI =require("openai");
+const OpenAI = require("openai");
 const bodyParser = require("body-parser");
 const http = require("http");
 
-const {connectDB , sequelize} = require("./config/db.js")
-
+const { connectDB, sequelize } = require("./config/db.js");
 dotenv.config();
 
-const {setupWebSocketServers} = require("./routes/websocketRoutes")
-const { setupWebSocketServer } = require("./routes/websocketRoute");
-
-console.log("setupWebSocketServer:", setupWebSocketServer); 
-
-const { setBroadcastGPS, setLatestGPS } = require("./websocketInstance");
+// Start TCP server
+require("./tcp/tcpServer.js");
+// Start WebSocket server
+require("./websocket/index.js");
 
 // Initialize Express app and server
 const app = express();
 const server = http.createServer(app);
-
-
-const { broadcastGPS, latestGPS } = setupWebSocketServer(server);
-setBroadcastGPS(broadcastGPS);
-setLatestGPS(latestGPS);
 
 // PORT
 const PORT = process.env.PORT || 5000;
@@ -220,8 +212,8 @@ app.post("/api/ai-response", async (req, res) => {
 
 app.use("/api/fasttag", fasttagRoutes);
 
-// WebSocket server
-// setupWebSocketServers(server);
+
+// WebSocket server is started above
 
 // Fallback for unknown routes
 app.use((req, res, next) => {
@@ -237,5 +229,6 @@ app.use((err, req, res, next) => {
 
 // Start server
 server.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Express API running on http://localhost:${PORT}`);
+  console.log(`TCP and WebSocket servers started in same process.`);
 });
