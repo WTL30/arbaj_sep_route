@@ -39,7 +39,7 @@ sequelize.sync({ alter: true }).then(() => console.log("📊 DB Synced"));
 
 // Start TCP + WebSocket servers
 const { startTcpServer } = require("./tcp/tcpServer.js");
-require("./websocket/index.js");
+const { initWebSocket } = require("./websocket");
 
 // Routes
 app.get("/", (req, res) => res.send("✅ API is running"));
@@ -119,6 +119,8 @@ app.use((err, req, res, next) => {
 // Start server
 server.listen(PORT, () => {
   console.log(`🚀 Express API running on http://localhost:${PORT}`);
+  // Attach WebSocket server to HTTP server at path /ws (supports WSS via proxy)
+  initWebSocket(server);
   startTcpServer();  // Start TCP server after Express is running
   console.log(`🌐 TCP and WebSocket servers started in same process`);
 });

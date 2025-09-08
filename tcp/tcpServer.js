@@ -7,6 +7,8 @@ const TCP_PORT = parseInt(process.env.GPS_TCP_PORT || "4000", 10);
 const TCP_HOST = process.env.GPS_TCP_HOST || "0.0.0.0";
 
 const verifiedIMEIs = new Set();
+// Track last seen activity for each IMEI for debugging/observability
+const lastSeen = new Map(); // imei -> { time, addr, port, lat, lon, speed }
 
 console.log("🚦 Starting TCP Server...");
 
@@ -61,7 +63,8 @@ function configureGPSDevice(socket) {
 
 // Create TCP Server
 const tcpServer = net.createServer((socket) => {
-  console.log("📡 New GPS device connected");
+  const { remoteAddress, remotePort } = socket;
+  console.log(`📡 New GPS device connected from ${remoteAddress}:${remotePort}`);
   let deviceIMEI = null;
 
   socket.on("data", async (data) => {
@@ -73,6 +76,7 @@ const tcpServer = net.createServer((socket) => {
       if (raw.startsWith("{") && raw.endsWith("}")) {
         const parsed = JSON.parse(raw);
         if (parsed.imei && parsed.lat && parsed.lng) {
+          console.log(`🧪 Manual JSON GPS -> IMEI: ${parsed.imei} lat:${parsed.lat} lng:${parsed.lng} speed:${parsed.speed ?? 0}`);
           getBroadcastGPS()(
             parsed.imei,
             parsed.lat,
@@ -81,6 +85,14 @@ const tcpServer = net.createServer((socket) => {
             parsed.speed || 0
           );
           console.log(`✅ Broadcasted manual GPS: ${parsed.imei}`);
+          lastSeen.set(parsed.imei, {
+            time: new Date().toISOString(),
+            addr: remoteAddress,
+            port: remotePort,
+            lat: Number(parsed.lat),
+            lon: Number(parsed.lng),
+            speed: Number(parsed.speed || 0),
+          });
         }
         socket.write("ACK: JSON received\n");
         return;
@@ -94,18 +106,30 @@ const tcpServer = net.createServer((socket) => {
         const imeiHex = hex.substring(8, 24);
         const imei = decodeIMEI(imeiHex);
         deviceIMEI = imei;
-        console.log(`🔑 Login IMEI: ${imei}`);
+        console.log(`🔑 Login IMEI: ${imei} from ${remoteAddress}:${remotePort}`);
         const cab = await CabsDetails.findOne({ where: { imei } });
-        if (cab) verifiedIMEIs.add(imei);
+        if (cab) {
+          verifiedIMEIs.add(imei);
+          console.log(`✅ IMEI ${imei} verified against DB (Cab ID: ${cab.id}, Cab No: ${cab.cabNumber || 'N/A'})`);
+        } else {
+          console.warn(`⚠️ IMEI ${imei} not found in CabsDetails table. Will still accept GPS, but mark as unverified.`);
+        }
         const serialNumber = hex.substring(24, 28);
         const ack = createACK("01", serialNumber);
         socket.write(Buffer.from(ack, "hex"));
+        lastSeen.set(imei, { time: new Date().toISOString(), addr: remoteAddress, port: remotePort });
       }
 
       // Heartbeat
       else if (protocol === "13") {
         const serialNumber = hex.substring(hex.length - 8, hex.length - 4);
         socket.write(Buffer.from(createACK("13", serialNumber), "hex"));
+        if (deviceIMEI) {
+          lastSeen.set(deviceIMEI, { ...(lastSeen.get(deviceIMEI) || {}), time: new Date().toISOString(), addr: remoteAddress, port: remotePort });
+          console.log(`💓 Heartbeat from IMEI ${deviceIMEI} @ ${remoteAddress}:${remotePort}`);
+        } else {
+          console.warn(`💓 Heartbeat received before login from ${remoteAddress}:${remotePort}`);
+        }
       }
 
       // GPS Data
@@ -120,19 +144,23 @@ const tcpServer = net.createServer((socket) => {
         const lon = parseInt(longitudeHex, 16) / 1800000;
         const speed = parseInt(speedHex, 16);
         const ignition = (parseInt(statusHex, 16) & 0x08) !== 0 || speed > 2;
+        if (!deviceIMEI) {
+          console.warn(`📍 GPS packet received without prior login from ${remoteAddress}:${remotePort}. Proceeding but IMEI unknown.`);
+        }
+        const tag = deviceIMEI || 'UNKNOWN_IMEI';
+        console.log(`📍 GPS IMEI:${tag} lat:${lat.toFixed(6)} lon:${lon.toFixed(6)} speed:${speed} ign:${ignition ? 'ON' : 'OFF'} from ${remoteAddress}:${remotePort}`);
 
-        console.log(`📍 GPS ${deviceIMEI}: ${lat}, ${lon}, Speed: ${speed}`);
-
-        getBroadcastGPS()(deviceIMEI, lat, lon, ignition, speed);
+        getBroadcastGPS()(tag, lat, lon, ignition, speed);
 
         socket.write(Buffer.from(createACK("22", serialNumber), "hex"));
+        lastSeen.set(tag, { time: new Date().toISOString(), addr: remoteAddress, port: remotePort, lat, lon, speed });
       }
     } catch (err) {
       console.error("❌ Error parsing TCP:", err.message);
     }
   });
 
-  socket.on("close", () => console.log("🔌 GPS device disconnected"));
+  socket.on("close", () => console.log(`🔌 GPS device disconnected from ${remoteAddress}:${remotePort} (IMEI:${deviceIMEI || 'unknown'})`));
   socket.on("error", (err) => console.error("⚠️ TCP socket error:", err.message));
 });
 
