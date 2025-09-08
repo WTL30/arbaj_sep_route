@@ -136,26 +136,7 @@ const tcpServer = net.createServer((socket) => {
   socket.on("error", (err) => console.error("⚠️ TCP socket error:", err.message));
 });
 
-// Export the server and start function
-function startTcpServer() {
-  if (tcpServer.listening) {
-    console.log('⚠️ TCP Server is already running');
-    return;
-  }
-
-  tcpServer.listen(TCP_PORT, TCP_HOST, () => {
-    console.log(`🚀 TCP Server listening on ${TCP_HOST}:${TCP_PORT}`);
-  });
-
-  tcpServer.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`❌ TCP Port ${TCP_PORT} is already in use`);
-    } else {
-      console.error('❌ TCP Server error:', err);
-    }
-  });
-}
-
-module.exports = {
-  startTcpServer
-};
+// Start the server
+tcpServer.listen(TCP_PORT, TCP_HOST, () => {
+  console.log(`🚀 TCP Server listening on ${TCP_HOST}:${TCP_PORT}`);
+});
