@@ -71,7 +71,7 @@
 const { Sequelize, DataTypes } = require('sequelize');
 
 // Sequelize instance
-const sequelize = new Sequelize('Route-Budget', 'postgres', 'root', {
+const sequelize = new Sequelize('route_budget', 'postgres', 'password@181298', {
   host: 'localhost',
   dialect: 'postgres',
   logging: false,
