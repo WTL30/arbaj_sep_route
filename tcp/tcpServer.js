@@ -184,6 +184,18 @@ function startTcpServer() {
   });
 }
 
+// Getter for last seen snapshot
+function getLastSeenSnapshot(imei) {
+  if (imei) {
+    return lastSeen.get(imei) || null;
+  }
+  // Return all snapshots as a plain object for debugging (avoid Map serialization issues)
+  const obj = {};
+  for (const [key, value] of lastSeen.entries()) obj[key] = value;
+  return obj;
+}
+
 module.exports = {
-  startTcpServer
+  startTcpServer,
+  getLastSeenSnapshot,
 };

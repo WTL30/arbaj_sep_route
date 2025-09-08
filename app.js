@@ -9,6 +9,7 @@ const http = require("http");
 const { OpenAI } = require("openai");  // Add OpenAI import
 
 const { connectDB, sequelize } = require("./config/db.js");
+const { getLastSeenSnapshot } = require("./tcp/tcpServer.js");
 dotenv.config();
 
 const app = express();
@@ -43,6 +44,20 @@ const { initWebSocket } = require("./websocket");
 
 // Routes
 app.get("/", (req, res) => res.send("✅ API is running"));
+
+// Debug: last seen GPS snapshot per IMEI (optionally secure with auth middleware)
+app.get("/api/debug/gps/:imei", (req, res) => {
+  try {
+    const { imei } = req.params;
+    if (!imei) return res.status(400).json({ message: "IMEI is required" });
+    const snapshot = getLastSeenSnapshot(imei);
+    if (!snapshot) return res.status(404).json({ message: "No snapshot for this IMEI yet" });
+    return res.json({ imei, snapshot });
+  } catch (err) {
+    console.error("/api/debug/gps error", err);
+    return res.status(500).json({ message: "Internal error" });
+  }
+});
 
 // Import Routes
 const loginRoutes = require("./routes/loginRoutes");
